@@ -7,7 +7,7 @@ This document outlines the key architecture decisions, patterns, and rationale f
 - **App Name:**
 - **Description:**
 - **Main Technologies:** (e.g., Flutter, Dart, REST API, etc.)
-- **Target Platforms:** (e.g., Android, iOS, Web, Desktop)
+- **Target Platforms:** Web, iOS, Android
 
 ## 2. High-Level Architecture
 - **Diagram:** (Insert or link to a diagram if available)
@@ -35,6 +35,10 @@ This document outlines the key architecture decisions, patterns, and rationale f
 
 ## 6. References
 - Links to relevant docs, ADRs, or resources
+
+## Core concept
+- Playable offline, does not require network to be able to play (only needed when first time running the app or when game is updated with new puzzles like daily puzzles)
+- Puzzles are auto-generated with possibility to human-generate (requires an algorithm to spead the characters on the game grid)
 
 ---
 
