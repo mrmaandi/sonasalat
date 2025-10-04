@@ -118,6 +118,35 @@ class SelectionLinePainter extends CustomPainter {
   }
 }
 
+// Custom painter for animating the last segment
+class _AnimatedSegmentPainter extends CustomPainter {
+  final Offset start;
+  final Offset end;
+  final double progress;
+
+  _AnimatedSegmentPainter({required this.start, required this.end, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 75.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final currentEnd = Offset(
+      start.dx + (end.dx - start.dx) * progress,
+      start.dy + (end.dy - start.dy) * progress,
+    );
+    canvas.drawLine(start, currentEnd, paint);
+  }
+
+  @override
+  bool shouldRepaint(_AnimatedSegmentPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.start != start || oldDelegate.end != end;
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -141,6 +170,13 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  // Controls trace line disappearance animation
+  bool _animateTraceLineOut = false;
+  // Track previous segment for reverse animation
+  String? _prevSegmentStart;
+  String? _prevSegmentEnd;
+  // Track if the last action was a removal (for reverse animation)
+  bool _lastActionWasRemove = false;
   static const int gridSize = 4;
   static const int minWordLength = 4;
   late List<List<String>> letterGrid;
@@ -290,10 +326,15 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       } else if (selectedCellsOrder.length > 1 && selectedCellsOrder[selectedCellsOrder.length - 2] == pos) {
         setState(() {
+          // Store previous segment for reverse animation
+          _prevSegmentStart = selectedCellsOrder[selectedCellsOrder.length - 2];
+          _prevSegmentEnd = selectedCellsOrder.last;
           String lastPos = selectedCellsOrder.removeLast();
           selectedCells.remove(lastPos);
+          _lastActionWasRemove = true;
         });
       } else if (isClick) {
+        _lastActionWasRemove = false;
         // If clicked cell is not adjacent to last, reset selection and start new
         final lastCell = selectedCellsOrder.last;
         if (!_areAdjacent(lastCell, pos)) {
@@ -311,6 +352,7 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           selectedCells.add(pos);
           selectedCellsOrder.add(pos);
+          _lastActionWasRemove = false;
         });
       } else if (isClick) {
         // If clicked cell is not adjacent, reset selection and start new
@@ -319,6 +361,7 @@ class _MyHomePageState extends State<MyHomePage> {
           selectedCellsOrder.clear();
           selectedCells.add(pos);
           selectedCellsOrder.add(pos);
+          _lastActionWasRemove = false;
         });
       }
     }
@@ -416,9 +459,15 @@ class _MyHomePageState extends State<MyHomePage> {
           finalTime = elapsedTime;
           showNextPuzzleButton = currentPuzzleIndex < puzzles.length - 1;
         }
-        // Only clear selection if a valid word was found
-        selectedCells.clear();
-        selectedCellsOrder.clear();
+        // Animate trace line out, then clear selection after animation
+        _animateTraceLineOut = true;
+      });
+      Future.delayed(const Duration(milliseconds: 350), () {
+        setState(() {
+          selectedCells.clear();
+          selectedCellsOrder.clear();
+          _animateTraceLineOut = false;
+        });
       });
     }
   }
@@ -466,14 +515,14 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Theme: $theme',
+                      'Teema: $theme',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      'Time: $elapsedTime',
+                      'Aeg: $elapsedTime',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -482,7 +531,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
                 Text(
-                  'Found ${foundWords.length}/${puzzles[currentPuzzleIndex].words.length} words',
+                  'Leitud ${foundWords.length}/${puzzles[currentPuzzleIndex].words.length} sõna',
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 16),
@@ -493,7 +542,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       selectedCellsOrder.clear();
                     });
                   },
-                  child: const Text('Reset Word'),
+                  child: const Text('Nulli sõna'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
@@ -507,7 +556,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   height: 40,
                   alignment: Alignment.center,
                   child: Text(
-                    selectedCells.isEmpty ? 'Select letters to form a word' : _getCurrentWord(),
+                    selectedCells.isEmpty ? 'Vali tähed, et moodustada sõna' : _getCurrentWord(),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -550,42 +599,112 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final row = index ~/ gridSize;
                                     final col = index % gridSize;
                                     final pos = _posToKey(row, col);
+                                    final letter = letterGrid[row][col];
+                                    final isVisible = letter.trim().isNotEmpty;
                                     return Positioned(
                                       left: col * cellSize,
                                       top: row * cellSize,
                                       width: cellSize,
                                       height: cellSize,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          _handleCellSelection(row, col, isClick: true);
-                                          WidgetsBinding.instance.addPostFrameCallback((_) => _checkWord());
-                                        },
-                                        child: Container(
-                                          margin: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(8), // Small radius for boxy look
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.08),
-                                                blurRadius: 2,
-                                                spreadRadius: 0,
-                                              ),
-                                            ],
+                                      child: AnimatedScale(
+                                        scale: isVisible ? 1.0 : 0.0,
+                                        duration: const Duration(milliseconds: 350),
+                                        curve: Curves.easeIn,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            _handleCellSelection(row, col, isClick: true);
+                                            WidgetsBinding.instance.addPostFrameCallback((_) => _checkWord());
+                                          },
+                                          child: Container(
+                                            margin: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     );
                                   }),
-                                  // Middle layer: Selection lines
+                                  // Middle layer: Selection lines (only latest segment animated)
                                   LayoutBuilder(
                                     builder: (context, constraints) {
-                                      return CustomPaint(
-                                        size: Size(constraints.maxWidth, constraints.maxHeight),
-                                        painter: SelectionLinePainter(
-                                          selectedCellsOrder: selectedCellsOrder,
-                                          cellSize: cellSize,
-                                          gridSize: gridSize,
+                                      final segments = selectedCellsOrder.length;
+                                      if (segments == 0) return const SizedBox.shrink();
+                                      return AnimatedOpacity(
+                                        opacity: _animateTraceLineOut ? 0.0 : 1.0,
+                                        duration: const Duration(milliseconds: 350),
+                                        child: Stack(
+                                          children: [
+                                            // Always draw static segments instantly, including after reverse animation
+                                            CustomPaint(
+                                              key: ValueKey('static-segments-${segments}-${selectedCellsOrder.join('-')}'),
+                                              size: Size(constraints.maxWidth, constraints.maxHeight),
+                                              painter: SelectionLinePainter(
+                                                selectedCellsOrder: segments > 1
+                                                    ? selectedCellsOrder.sublist(0, segments - 1)
+                                                    : selectedCellsOrder,
+                                                cellSize: cellSize,
+                                                gridSize: gridSize,
+                                              ),
+                                            ),
+                                            // Animate only the last segment (forward) or the segment being removed (reverse)
+                                            if (segments > 1 && !_lastActionWasRemove)
+                                              KeyedSubtree(
+                                                key: ValueKey('animated-segment-${segments - 1}-${selectedCellsOrder.join('-')}-forward'),
+                                                child: TweenAnimationBuilder<double>(
+                                                  tween: Tween<double>(begin: 0, end: 1),
+                                                  duration: const Duration(milliseconds: 250),
+                                                  builder: (context, t, child) {
+                                                    final current = selectedCellsOrder[segments - 2].split(',').map(int.parse).toList();
+                                                    final next = selectedCellsOrder[segments - 1].split(',').map(int.parse).toList();
+                                                    final startX = (current[1] + 0.5) * cellSize;
+                                                    final startY = (current[0] + 0.5) * cellSize;
+                                                    final endX = (next[1] + 0.5) * cellSize;
+                                                    final endY = (next[0] + 0.5) * cellSize;
+                                                    return CustomPaint(
+                                                      size: Size(constraints.maxWidth, constraints.maxHeight),
+                                                      painter: _AnimatedSegmentPainter(
+                                                        start: Offset(startX, startY),
+                                                        end: Offset(endX, endY),
+                                                        progress: t,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            // Animate the segment being removed in reverse
+                                            if (_lastActionWasRemove && _prevSegmentStart != null && _prevSegmentEnd != null)
+                                              KeyedSubtree(
+                                                key: ValueKey('reverse-animated-segment-${segments}-${selectedCellsOrder.join('-')}'),
+                                                child: TweenAnimationBuilder<double>(
+                                                  tween: Tween<double>(begin: 1, end: 0),
+                                                  duration: const Duration(milliseconds: 250),
+                                                  onEnd: () {
+                                                    setState(() {
+                                                      _lastActionWasRemove = false;
+                                                      _prevSegmentStart = null;
+                                                      _prevSegmentEnd = null;
+                                                    });
+                                                  },
+                                                  builder: (context, t, child) {
+                                                    final current = _prevSegmentStart!.split(',').map(int.parse).toList();
+                                                    final next = _prevSegmentEnd!.split(',').map(int.parse).toList();
+                                                    final startX = (current[1] + 0.5) * cellSize;
+                                                    final startY = (current[0] + 0.5) * cellSize;
+                                                    final endX = (next[1] + 0.5) * cellSize;
+                                                    final endY = (next[0] + 0.5) * cellSize;
+                                                    return CustomPaint(
+                                                      size: Size(constraints.maxWidth, constraints.maxHeight),
+                                                      painter: _AnimatedSegmentPainter(
+                                                        start: Offset(startX, startY),
+                                                        end: Offset(endX, endY),
+                                                        progress: t,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       );
                                     },
@@ -605,7 +724,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         child: Text(
                                           letterGrid[row][col],
                                           style: TextStyle(
-                                            fontSize: 24,
+                                            fontSize: 48,
                                             fontWeight: FontWeight.bold,
                                             color: isSelected ? Colors.white : Colors.black,
                                           ),
@@ -630,7 +749,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Words to find:',
+                        'Leia sõnad:',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -643,31 +762,20 @@ class _MyHomePageState extends State<MyHomePage> {
                         children: puzzles[currentPuzzleIndex].words.map((word) {
                           final found = foundWords.contains(word);
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                             decoration: BoxDecoration(
-                              color: found ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                              color: found ? Colors.green : Colors.grey.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: found ? Colors.green : Colors.grey,
-                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (found)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 16,
-                                  ),
-                                if (found)
-                                  const SizedBox(width: 4),
                                 Text(
                                   word,
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: found ? Colors.green : Colors.black,
-                                    fontWeight: found ? FontWeight.bold : FontWeight.normal,
+                                    color: found ? Colors.white : Colors.black,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
@@ -703,7 +811,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        '🎉 Congratulations! 🎉',
+                        '🎉 Palju õnne! 🎉',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -712,7 +820,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'You found all the words!',
+                        'Leidsid kõik sõnad!',
                         style: TextStyle(
                           fontSize: 18,
                           color: Colors.grey[800],
@@ -720,7 +828,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Time: $finalTime',
+                        'Aeg: $finalTime',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -732,7 +840,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         ElevatedButton.icon(
                           onPressed: () => _resetGame(currentPuzzleIndex + 1),
                           icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Next Puzzle'),
+                          label: const Text('Järgmine mõistatus'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
@@ -747,7 +855,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         ElevatedButton.icon(
                           onPressed: () => _resetGame(0),
                           icon: const Icon(Icons.replay),
-                          label: const Text('Play Again'),
+                          label: const Text('Mängi uuesti'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
