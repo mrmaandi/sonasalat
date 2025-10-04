@@ -19,26 +19,22 @@ Word Salad is a fun and challenging word puzzle game where players are presented
 - Visually engaging and accessible UI for all ages.
 
 ## Example
-**Theme:** Animals
+**Theme:** Venomous Creatures
 
 |   |   |   |   |
 |---|---|---|---|
-| O | G | L | I |
-| B | I | R | D |
-| F | O | X | E |
-| C | A | T | D |
+| V | U | D | W |
+| Q | I | A | E |
+| O | S | P | R |
+| N | C | O | B |
 
-Possible words: CAT, DOG, BIRD, FOX
+Words to find: COBRA, SCORPION, SPIDER, SQUID, VIPER, WASP
 
 
 ## Target Audience
 - Puzzle and word game enthusiasts
 - Players of all ages looking for a quick and engaging brain exercise
 
-## Monetization (not important for now)
-- Free to play with ability to redeem hints for watching short ads
-- Paid version to remove ads
-
 ---
 
-This document describes the core idea and gameplay mechanics for the Word Salad themed word link game. Further sections can be added for technical design, UI mockups, and development roadmap as the project progresses.
+This document describes the core idea and gameplay mechanics for the Word Salad themed word link game.
