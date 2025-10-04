@@ -5,6 +5,18 @@ void main() {
   runApp(const MyApp());
 }
 
+class Puzzle {
+  final String theme;
+  final List<List<String>> grid;
+  final List<String> words;
+
+  const Puzzle({
+    required this.theme,
+    required this.grid,
+    required this.words,
+  });
+}
+
 class SelectionLinePainter extends CustomPainter {
   final List<String> selectedCellsOrder;
   final double cellSize;
@@ -16,16 +28,61 @@ class SelectionLinePainter extends CustomPainter {
     required this.gridSize,
   });
 
+  Color _interpolateColor(Color a, Color b, double t) {
+    return Color.fromARGB(
+      (a.alpha + (b.alpha - a.alpha) * t).round(),
+      (a.red + (b.red - a.red) * t).round(),
+      (a.green + (b.green - a.green) * t).round(),
+      (a.blue + (b.blue - b.blue) * t).round(),
+    );
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
-    if (selectedCellsOrder.length < 2) return;
+    if (selectedCellsOrder.isEmpty) return;
 
+    const maxWordLength = 16;
+    final startColor = Colors.green;
+    final endColor = Colors.purple;
+    
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.5)
-      ..strokeWidth = 4.0
+      ..strokeWidth = 75.0
       ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
+    // Draw background paths first
+    final backgroundPaint = Paint()
+      ..strokeWidth = 75.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..color = Colors.white;  // White background for contrast
+
+    if (selectedCellsOrder.length == 1) {
+      // For a single selected letter, draw a circle
+      final current = selectedCellsOrder[0].split(',').map(int.parse).toList();
+      final centerX = (current[1] + 0.5) * cellSize;
+      final centerY = (current[0] + 0.5) * cellSize;
+      
+      // Draw white background circle first
+      canvas.drawCircle(
+        Offset(centerX, centerY),
+        5.0, // Small radius for the dot
+        backgroundPaint,
+      );
+      
+      // Draw colored circle
+      paint.color = startColor;
+      canvas.drawCircle(
+        Offset(centerX, centerY),
+        5.0, // Small radius for the dot
+        paint,
+      );
+      return;
+    }
+
+    // For multiple selected letters, draw lines
     for (int i = 0; i < selectedCellsOrder.length - 1; i++) {
       final current = selectedCellsOrder[i].split(',').map(int.parse).toList();
       final next = selectedCellsOrder[i + 1].split(',').map(int.parse).toList();
@@ -35,6 +92,18 @@ class SelectionLinePainter extends CustomPainter {
       final endX = (next[1] + 0.5) * cellSize;
       final endY = (next[0] + 0.5) * cellSize;
 
+      // Draw white background line first
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(endX, endY),
+        backgroundPaint,
+      );
+
+      // Always progress the color regardless of direction
+      final progress = i / (maxWordLength - 1);
+      paint.color = _interpolateColor(startColor, endColor, progress);
+
+      // Draw the colored line
       canvas.drawLine(
         Offset(startX, startY),
         Offset(endX, endY),
@@ -75,7 +144,7 @@ class _MyHomePageState extends State<MyHomePage> {
   static const int gridSize = 4;
   static const int minWordLength = 4;
   late List<List<String>> letterGrid;
-  final String theme = 'Venomous creatures';
+  late String theme;
   bool hasWon = false;
   String finalTime = '';
 
@@ -90,23 +159,47 @@ class _MyHomePageState extends State<MyHomePage> {
   DateTime? startTime;
   String elapsedTime = '00:00';
 
-  final List<String> themeWords = [
-    'COBRA',
-    'SCORPION',
-    'SPIDER',
-    'SQUID',
-    'VIPER',
-    'WASP',
+  // Current puzzle tracking
+  int currentPuzzleIndex = 0;
+  bool showNextPuzzleButton = false;
+
+  final List<Puzzle> puzzles = [
+    Puzzle(
+      theme: 'Venomous creatures',
+      grid: [
+        ['V', 'U', 'D', 'W'],
+        ['Q', 'I', 'A', 'E'],
+        ['O', 'S', 'P', 'R'],
+        ['N', 'C', 'O', 'B'],
+      ],
+      words: ['COBRA', 'SCORPION', 'SPIDER', 'SQUID', 'VIPER', 'WASP'],
+    ),
+    Puzzle(
+      theme: 'Värvid',
+      grid: [
+        ['K', 'S', 'I', 'L'],
+        ['P', 'O', 'L', 'N'],
+        ['U', 'E', 'I', 'L'],
+        ['N', 'A', 'N', 'A'],
+      ],
+      words: ['SININE', 'KOLLANE', 'PUNANE', 'LILLA'],
+    ),
   ];
 
-  void _resetGame() {
+  void _resetGame([int? puzzleIndex]) {
     setState(() {
-      letterGrid = _generateThemedGrid();
-      availableWords = themeWords.toList();
+      if (puzzleIndex != null) {
+        currentPuzzleIndex = puzzleIndex;
+      }
+      final puzzle = puzzles[currentPuzzleIndex];
+      letterGrid = List.from(puzzle.grid.map((row) => List<String>.from(row)));
+      theme = puzzle.theme;
+      availableWords = puzzle.words.toList();
       foundWords.clear();
       selectedCells.clear();
       selectedCellsOrder.clear();
       hasWon = false;
+      showNextPuzzleButton = false;
       startTime = DateTime.now();
       elapsedTime = '00:00';
     });
@@ -114,44 +207,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   String _posToKey(int row, int col) => '$row,$col';
-  
-  bool _isLetterInRemainingWords(String letter) {
-    for (var word in themeWords) {
-      if (!foundWords.contains(word) && word.contains(letter)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void _removeUnusedLetters() {
-    List<List<String>> newGrid = List.generate(
-      gridSize,
-      (i) => List.generate(gridSize, (j) => letterGrid[i][j])
-    );
-
-    for (int i = 0; i < gridSize; i++) {
-      for (int j = 0; j < gridSize; j++) {
-        if (!_isLetterInRemainingWords(letterGrid[i][j])) {
-          newGrid[i][j] = ' ';
-        }
-      }
-    }
-
-    setState(() {
-      letterGrid = newGrid;
-    });
-  }
-
-  List<List<String>> _generateThemedGrid() {
-    // Return the exact example grid
-    return [
-      ['V', 'U', 'D', 'W'],
-      ['Q', 'I', 'A', 'E'],
-      ['O', 'S', 'P', 'R'],
-      ['N', 'C', 'O', 'B'],
-    ];
-  }
 
   void _startTimer() {
     Future.doWhile(() async {
@@ -195,14 +250,14 @@ class _MyHomePageState extends State<MyHomePage> {
         final radius = cellSize * 0.4;
         
         if (distance <= radius) {
-          _handleCellSelection(row, col);
+          _handleCellSelection(row, col, isClick: false);
           return;
         }
       }
     }
   }
 
-  void _handleCellSelection(int row, int col) {
+  void _handleCellSelection(int row, int col, {bool isClick = false}) {
     // Don't select empty cells
     if (letterGrid[row][col].trim().isEmpty) {
       return;
@@ -210,10 +265,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final pos = _posToKey(row, col);
     
-    if (!isDragging) {
+    // Only clear selection if starting a new drag, not on click
+    if (!isDragging && selectedCells.isEmpty) {
       setState(() {
-        selectedCells.clear();
-        selectedCellsOrder.clear();
         selectedCells.add(pos);
         selectedCellsOrder.add(pos);
       });
@@ -226,13 +280,30 @@ class _MyHomePageState extends State<MyHomePage> {
         selectedCellsOrder.add(pos);
       });
     } else if (selectedCells.contains(pos)) {
-      // If we're swiping back to the last-but-one selected cell, remove the last cell
-      if (selectedCellsOrder.length > 1 && 
-          selectedCellsOrder[selectedCellsOrder.length - 2] == pos) {
+      // If clicking the first selected letter, clear and start new selection from it
+      if (isClick && selectedCellsOrder.isNotEmpty && selectedCellsOrder[0] == pos) {
+        setState(() {
+          selectedCells.clear();
+          selectedCellsOrder.clear();
+          selectedCells.add(pos);
+          selectedCellsOrder.add(pos);
+        });
+      } else if (selectedCellsOrder.length > 1 && selectedCellsOrder[selectedCellsOrder.length - 2] == pos) {
         setState(() {
           String lastPos = selectedCellsOrder.removeLast();
           selectedCells.remove(lastPos);
         });
+      } else if (isClick) {
+        // If clicked cell is not adjacent to last, reset selection and start new
+        final lastCell = selectedCellsOrder.last;
+        if (!_areAdjacent(lastCell, pos)) {
+          setState(() {
+            selectedCells.clear();
+            selectedCellsOrder.clear();
+            selectedCells.add(pos);
+            selectedCellsOrder.add(pos);
+          });
+        }
       }
     } else if (!selectedCells.contains(pos)) {
       final lastCell = selectedCellsOrder.last;
@@ -241,43 +312,124 @@ class _MyHomePageState extends State<MyHomePage> {
           selectedCells.add(pos);
           selectedCellsOrder.add(pos);
         });
+      } else if (isClick) {
+        // If clicked cell is not adjacent, reset selection and start new
+        setState(() {
+          selectedCells.clear();
+          selectedCellsOrder.clear();
+          selectedCells.add(pos);
+          selectedCellsOrder.add(pos);
+        });
       }
     }
+  }
+
+  // Finds all possible paths for a word starting from a given position
+  List<List<String>> _findPossiblePaths(String word, int startRow, int startCol, Set<String> visited) {
+    if (word.isEmpty) return [[]];
+    
+    List<List<String>> paths = [];
+    String pos = _posToKey(startRow, startCol);
+    
+    if (letterGrid[startRow][startCol] != word[0] || visited.contains(pos)) {
+      return paths;
+    }
+    
+    if (word.length == 1) {
+      return [[pos]];
+    }
+    
+    visited.add(pos);
+    
+    // Check all adjacent cells
+    for (int dr = -1; dr <= 1; dr++) {
+      for (int dc = -1; dc <= 1; dc++) {
+        if (dr == 0 && dc == 0) continue;
+        
+        int newRow = startRow + dr;
+        int newCol = startCol + dc;
+        
+        if (newRow >= 0 && newRow < gridSize && 
+            newCol >= 0 && newCol < gridSize) {
+          var subPaths = _findPossiblePaths(
+            word.substring(1),
+            newRow,
+            newCol,
+            Set.from(visited)
+          );
+          
+          for (var subPath in subPaths) {
+            paths.add([pos, ...subPath]);
+          }
+        }
+      }
+    }
+    
+    return paths;
+  }
+
+  // Check if a letter at a specific position is needed for remaining words
+  bool _isPositionNeededForRemainingWords(int row, int col) {
+    String pos = _posToKey(row, col);
+    
+    // Check each remaining unfound word
+    for (var word in puzzles[currentPuzzleIndex].words) {
+      if (!foundWords.contains(word)) {
+        // Check if any valid path for this word uses this position
+        for (int startRow = 0; startRow < gridSize; startRow++) {
+          for (int startCol = 0; startCol < gridSize; startCol++) {
+            var paths = _findPossiblePaths(word, startRow, startCol, {});
+            for (var path in paths) {
+              if (path.contains(pos)) {
+                return true; // This position is needed for a valid path
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
   }
 
   void _checkWord() {
     final word = _getCurrentWord();
     if (word.length >= minWordLength && 
-        themeWords.contains(word) && 
+        puzzles[currentPuzzleIndex].words.contains(word) && 
         !foundWords.contains(word)) {
       setState(() {
         foundWords.add(word);
-        _removeUnusedLetters();
-        
+        // Clear letters only if they're not needed for remaining words
+        for (String pos in selectedCellsOrder) {
+          final coords = pos.split(',').map(int.parse).toList();
+          if (!_isPositionNeededForRemainingWords(coords[0], coords[1])) {
+            letterGrid[coords[0]][coords[1]] = ' ';
+          }
+        }
         // Check if player has won
         print('Found words: ${foundWords.toList()}');
-        print('Theme words: $themeWords');
-        
-        // Check if all theme words are found
-        bool allWordsFound = themeWords.every((word) => foundWords.contains(word));
+        print('Theme words: ${puzzles[currentPuzzleIndex].words}');
+        // Check if all words are found
+        bool allWordsFound = puzzles[currentPuzzleIndex].words.every((word) => foundWords.contains(word));
         if (allWordsFound) {
-          print('All words found! Setting hasWon to true');
+          print('All words found!');
           hasWon = true;
           finalTime = elapsedTime;
+          showNextPuzzleButton = currentPuzzleIndex < puzzles.length - 1;
         }
+        // Only clear selection if a valid word was found
+        selectedCells.clear();
+        selectedCellsOrder.clear();
       });
     }
-    setState(() {
-      selectedCells.clear();
-      selectedCellsOrder.clear();
-    });
   }
 
   @override
   void initState() {
     super.initState();
-    letterGrid = _generateThemedGrid();
-    availableWords = themeWords.toList();
+    final puzzle = puzzles[currentPuzzleIndex];
+    letterGrid = List.from(puzzle.grid.map((row) => List<String>.from(row)));
+    theme = puzzle.theme;
+    availableWords = puzzle.words.toList();
     startTime = DateTime.now();
     _startTimer();
   }
@@ -287,7 +439,21 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.amber,
-        title: Text(widget.title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: currentPuzzleIndex > 0
+              ? () => _resetGame(currentPuzzleIndex - 1)
+              : null,
+        ),
+        title: Text('${widget.title} - ${currentPuzzleIndex + 1}/${puzzles.length}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_forward),
+            onPressed: currentPuzzleIndex < puzzles.length - 1
+                ? () => _resetGame(currentPuzzleIndex + 1)
+                : null,
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -299,15 +465,44 @@ class _MyHomePageState extends State<MyHomePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Theme: $theme'),
-                    Text('Time: $elapsedTime'),
+                    Text(
+                      'Theme: $theme',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Time: $elapsedTime',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 Text(
-                  'Found ${foundWords.length}/${themeWords.length} words',
+                  'Found ${foundWords.length}/${puzzles[currentPuzzleIndex].words.length} words',
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      selectedCells.clear();
+                      selectedCellsOrder.clear();
+                    });
+                  },
+                  child: const Text('Reset Word'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
                 Container(
                   height: 40,
                   alignment: Alignment.center,
@@ -324,90 +519,110 @@ class _MyHomePageState extends State<MyHomePage> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final cellSize = constraints.maxWidth / gridSize;
-                    return GestureDetector(
-                      onPanStart: (details) {
-                        isDragging = true;
-                        _handleTouchSelection(details.localPosition, cellSize);
-                      },
-                      onPanUpdate: (details) {
-                        if (!isDragging) return;
-                        if (details.localPosition.dx >= 0 && 
-                            details.localPosition.dx <= cellSize * gridSize &&
-                            details.localPosition.dy >= 0 && 
-                            details.localPosition.dy <= cellSize * gridSize) {
-                          _handleTouchSelection(details.localPosition, cellSize);
-                        }
-                      },
-                      onPanEnd: (_) {
-                        isDragging = false;
-                        _checkWord();
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(),
-                        ),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Stack(
-                            children: [
-                              // Custom paint for drawing lines
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return CustomPaint(
-                                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                                    painter: SelectionLinePainter(
-                                      selectedCellsOrder: selectedCellsOrder,
-                                      cellSize: cellSize,
-                                      gridSize: gridSize,
-                                    ),
-                                  );
-                                },
+                    return Column(
+                      children: [
+                        GestureDetector(
+                          onPanStart: (details) {
+                            isDragging = true;
+                            _handleTouchSelection(details.localPosition, cellSize);
+                          },
+                          onPanUpdate: (details) {
+                            if (!isDragging) return;
+                            if (details.localPosition.dx >= 0 && 
+                                details.localPosition.dx <= cellSize * gridSize &&
+                                details.localPosition.dy >= 0 && 
+                                details.localPosition.dy <= cellSize * gridSize) {
+                              _handleTouchSelection(details.localPosition, cellSize);
+                            }
+                          },
+                          onPanEnd: (_) {
+                            isDragging = false;
+                            _checkWord();
+                          },
+                          child: Container(
+                            // No outer border for the grid
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: Stack(
+                                children: [
+                                  // Bottom layer: Grid cell circles
+                                  ...List.generate(gridSize * gridSize, (index) {
+                                    final row = index ~/ gridSize;
+                                    final col = index % gridSize;
+                                    final pos = _posToKey(row, col);
+                                    return Positioned(
+                                      left: col * cellSize,
+                                      top: row * cellSize,
+                                      width: cellSize,
+                                      height: cellSize,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          _handleCellSelection(row, col, isClick: true);
+                                          WidgetsBinding.instance.addPostFrameCallback((_) => _checkWord());
+                                        },
+                                        child: Container(
+                                          margin: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8), // Small radius for boxy look
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.08),
+                                                blurRadius: 2,
+                                                spreadRadius: 0,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                  // Middle layer: Selection lines
+                                  LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      return CustomPaint(
+                                        size: Size(constraints.maxWidth, constraints.maxHeight),
+                                        painter: SelectionLinePainter(
+                                          selectedCellsOrder: selectedCellsOrder,
+                                          cellSize: cellSize,
+                                          gridSize: gridSize,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  // Top layer: Letters
+                                  ...List.generate(gridSize * gridSize, (index) {
+                                    final row = index ~/ gridSize;
+                                    final col = index % gridSize;
+                                    final isSelected = selectedCells.contains(_posToKey(row, col));
+                                    
+                                    return Positioned(
+                                      left: col * cellSize,
+                                      top: row * cellSize,
+                                      width: cellSize,
+                                      height: cellSize,
+                                      child: Center(
+                                        child: Text(
+                                          letterGrid[row][col],
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
                               ),
-                              // Grid cells
-                              ...List.generate(gridSize * gridSize, (index) {
-                                final row = index ~/ gridSize;
-                                final col = index % gridSize;
-                                final isSelected = selectedCells.contains(_posToKey(row, col));
-                                
-                                return Positioned(
-                                left: col * cellSize,
-                                top: row * cellSize,
-                                width: cellSize,
-                                height: cellSize,
-                                child: Container(
-                                  margin: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(width: 2),
-                                    color: isSelected && letterGrid[row][col].trim().isNotEmpty 
-                                      ? Colors.lightBlue.withOpacity(0.3) 
-                                      : Colors.white,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 2,
-                                        spreadRadius: 0,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      letterGrid[row][col],
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-                  ]),
+                            ),
+                          ),
                         ),
-                      ),
+                        // Removed Submit Word button
+                      ],
                     );
-                  },
-                ),
+              },
+            ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -425,7 +640,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       Wrap(
                         spacing: 16,
                         runSpacing: 8,
-                        children: themeWords.map((word) {
+                        children: puzzles[currentPuzzleIndex].words.map((word) {
                           final found = foundWords.contains(word);
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -513,20 +728,36 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: _resetGame,
-                        icon: const Icon(Icons.replay),
-                        label: const Text('Play Again'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
+                      if (showNextPuzzleButton)
+                        ElevatedButton.icon(
+                          onPressed: () => _resetGame(currentPuzzleIndex + 1),
+                          icon: const Icon(Icons.arrow_forward),
+                          label: const Text('Next Puzzle'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            textStyle: const TextStyle(fontSize: 18),
                           ),
-                          textStyle: const TextStyle(fontSize: 18),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          onPressed: () => _resetGame(0),
+                          icon: const Icon(Icons.replay),
+                          label: const Text('Play Again'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            textStyle: const TextStyle(fontSize: 18),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
