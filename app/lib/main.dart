@@ -542,7 +542,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       selectedCellsOrder.clear();
                     });
                   },
-                  child: const Text('Nulli sõna'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
@@ -551,6 +550,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
+                  child: const Text('Nulli sõna'),
                 ),
                 Container(
                   height: 40,
@@ -637,7 +637,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           children: [
                                             // Always draw static segments instantly, including after reverse animation
                                             CustomPaint(
-                                              key: ValueKey('static-segments-${segments}-${selectedCellsOrder.join('-')}'),
+                                              key: ValueKey('static-segments-$segments-${selectedCellsOrder.join('-')}'),
                                               size: Size(constraints.maxWidth, constraints.maxHeight),
                                               painter: SelectionLinePainter(
                                                 selectedCellsOrder: segments > 1
@@ -675,7 +675,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             // Animate the segment being removed in reverse
                                             if (_lastActionWasRemove && _prevSegmentStart != null && _prevSegmentEnd != null)
                                               KeyedSubtree(
-                                                key: ValueKey('reverse-animated-segment-${segments}-${selectedCellsOrder.join('-')}'),
+                                                key: ValueKey('reverse-animated-segment-$segments-${selectedCellsOrder.join('-')}'),
                                                 child: TweenAnimationBuilder<double>(
                                                   tween: Tween<double>(begin: 1, end: 0),
                                                   duration: const Duration(milliseconds: 250),
