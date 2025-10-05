@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' show sqrt;
+import 'util/selection_line_painter.dart';
+import 'util/animated_segment_painter.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,141 +12,7 @@ class Puzzle {
   final List<List<String>> grid;
   final List<String> words;
 
-  const Puzzle({
-    required this.theme,
-    required this.grid,
-    required this.words,
-  });
-}
-
-class SelectionLinePainter extends CustomPainter {
-  final List<String> selectedCellsOrder;
-  final double cellSize;
-  final int gridSize;
-
-  SelectionLinePainter({
-    required this.selectedCellsOrder,
-    required this.cellSize,
-    required this.gridSize,
-  });
-
-  Color _interpolateColor(Color a, Color b, double t) {
-    return Color.fromARGB(
-      (a.alpha + (b.alpha - a.alpha) * t).round(),
-      (a.red + (b.red - a.red) * t).round(),
-      (a.green + (b.green - a.green) * t).round(),
-      (a.blue + (b.blue - b.blue) * t).round(),
-    );
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (selectedCellsOrder.isEmpty) return;
-
-    const maxWordLength = 16;
-    final startColor = Colors.green;
-    final endColor = Colors.purple;
-    
-    final paint = Paint()
-      ..strokeWidth = 75.0
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-
-    // Draw background paths first
-    final backgroundPaint = Paint()
-      ..strokeWidth = 75.0
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke
-      ..color = Colors.white;  // White background for contrast
-
-    if (selectedCellsOrder.length == 1) {
-      // For a single selected letter, draw a circle
-      final current = selectedCellsOrder[0].split(',').map(int.parse).toList();
-      final centerX = (current[1] + 0.5) * cellSize;
-      final centerY = (current[0] + 0.5) * cellSize;
-      
-      // Draw white background circle first
-      canvas.drawCircle(
-        Offset(centerX, centerY),
-        5.0, // Small radius for the dot
-        backgroundPaint,
-      );
-      
-      // Draw colored circle
-      paint.color = startColor;
-      canvas.drawCircle(
-        Offset(centerX, centerY),
-        5.0, // Small radius for the dot
-        paint,
-      );
-      return;
-    }
-
-    // For multiple selected letters, draw lines
-    for (int i = 0; i < selectedCellsOrder.length - 1; i++) {
-      final current = selectedCellsOrder[i].split(',').map(int.parse).toList();
-      final next = selectedCellsOrder[i + 1].split(',').map(int.parse).toList();
-
-      final startX = (current[1] + 0.5) * cellSize;
-      final startY = (current[0] + 0.5) * cellSize;
-      final endX = (next[1] + 0.5) * cellSize;
-      final endY = (next[0] + 0.5) * cellSize;
-
-      // Draw white background line first
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        backgroundPaint,
-      );
-
-      // Always progress the color regardless of direction
-      final progress = i / (maxWordLength - 1);
-      paint.color = _interpolateColor(startColor, endColor, progress);
-
-      // Draw the colored line
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(SelectionLinePainter oldDelegate) {
-    return oldDelegate.selectedCellsOrder != selectedCellsOrder;
-  }
-}
-
-// Custom painter for animating the last segment
-class _AnimatedSegmentPainter extends CustomPainter {
-  final Offset start;
-  final Offset end;
-  final double progress;
-
-  _AnimatedSegmentPainter({required this.start, required this.end, required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 75.0
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    final currentEnd = Offset(
-      start.dx + (end.dx - start.dx) * progress,
-      start.dy + (end.dy - start.dy) * progress,
-    );
-    canvas.drawLine(start, currentEnd, paint);
-  }
-
-  @override
-  bool shouldRepaint(_AnimatedSegmentPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.start != start || oldDelegate.end != end;
-  }
+  const Puzzle({required this.theme, required this.grid, required this.words});
 }
 
 class MyApp extends StatelessWidget {
@@ -190,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<String> foundWords = {};
   List<String> availableWords = [];
   bool isDragging = false;
-  
+
   // Timer tracking
   DateTime? startTime;
   String elapsedTime = '00:00';
@@ -201,14 +69,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final List<Puzzle> puzzles = [
     Puzzle(
-      theme: 'Venomous creatures',
+      theme: 'Riided',
       grid: [
-        ['V', 'U', 'D', 'W'],
-        ['Q', 'I', 'A', 'E'],
-        ['O', 'S', 'P', 'R'],
-        ['N', 'C', 'O', 'B'],
+        ['P', 'K', 'I', 'L'],
+        ['M', 'Ü', 'T', 'E'],
+        ['B', 'K', 'S', 'E'],
+        ['A', 'R', 'I', 'D'],
       ],
-      words: ['COBRA', 'SCORPION', 'SPIDER', 'SQUID', 'VIPER', 'WASP'],
+      words: ['MÜTS', 'PÜKSID', 'KÜBAR', 'SEELIK'],
     ),
     Puzzle(
       theme: 'Värvid',
@@ -219,6 +87,16 @@ class _MyHomePageState extends State<MyHomePage> {
         ['N', 'A', 'N', 'A'],
       ],
       words: ['SININE', 'KOLLANE', 'PUNANE', 'LILLA'],
+    ),
+    Puzzle(
+      theme: 'Vedelikud',
+      grid: [
+        ['L', 'E', 'I', 'P'],
+        ['H', 'V', 'S', 'I'],
+        ['O', 'A', 'M', 'N'],
+        ['K', 'R', 'A', 'D'],
+      ],
+      words: ['KOHV', 'MAHL', 'PIIM', 'VIIN', 'VESI', 'PISARAD'],
     ),
   ];
 
@@ -248,23 +126,25 @@ class _MyHomePageState extends State<MyHomePage> {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted || hasWon) return false;
-      
+
       setState(() {
         final diff = DateTime.now().difference(startTime!);
         final minutes = diff.inMinutes.toString().padLeft(2, '0');
         final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
         elapsedTime = '$minutes:$seconds';
       });
-      
+
       return true;
     });
   }
 
   String _getCurrentWord() {
-    return selectedCellsOrder.map((pos) {
-      final coords = pos.split(',').map(int.parse).toList();
-      return letterGrid[coords[0]][coords[1]];
-    }).join('');
+    return selectedCellsOrder
+        .map((pos) {
+          final coords = pos.split(',').map(int.parse).toList();
+          return letterGrid[coords[0]][coords[1]];
+        })
+        .join('');
   }
 
   bool _areAdjacent(String pos1, String pos2) {
@@ -278,13 +158,13 @@ class _MyHomePageState extends State<MyHomePage> {
       for (int col = 0; col < gridSize; col++) {
         final centerX = (col + 0.5) * cellSize;
         final centerY = (row + 0.5) * cellSize;
-        
+
         final dx = localPosition.dx - centerX;
         final dy = localPosition.dy - centerY;
         final distance = sqrt(dx * dx + dy * dy);
-        
+
         final radius = cellSize * 0.4;
-        
+
         if (distance <= radius) {
           _handleCellSelection(row, col, isClick: false);
           return;
@@ -300,7 +180,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     final pos = _posToKey(row, col);
-    
+
     // Only clear selection if starting a new drag, not on click
     if (!isDragging && selectedCells.isEmpty) {
       setState(() {
@@ -317,14 +197,17 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     } else if (selectedCells.contains(pos)) {
       // If clicking the first selected letter, clear and start new selection from it
-      if (isClick && selectedCellsOrder.isNotEmpty && selectedCellsOrder[0] == pos) {
+      if (isClick &&
+          selectedCellsOrder.isNotEmpty &&
+          selectedCellsOrder[0] == pos) {
         setState(() {
           selectedCells.clear();
           selectedCellsOrder.clear();
           selectedCells.add(pos);
           selectedCellsOrder.add(pos);
         });
-      } else if (selectedCellsOrder.length > 1 && selectedCellsOrder[selectedCellsOrder.length - 2] == pos) {
+      } else if (selectedCellsOrder.length > 1 &&
+          selectedCellsOrder[selectedCellsOrder.length - 2] == pos) {
         setState(() {
           // Store previous segment for reverse animation
           _prevSegmentStart = selectedCellsOrder[selectedCellsOrder.length - 2];
@@ -368,53 +251,62 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   // Finds all possible paths for a word starting from a given position
-  List<List<String>> _findPossiblePaths(String word, int startRow, int startCol, Set<String> visited) {
+  List<List<String>> _findPossiblePaths(
+    String word,
+    int startRow,
+    int startCol,
+    Set<String> visited,
+  ) {
     if (word.isEmpty) return [[]];
-    
+
     List<List<String>> paths = [];
     String pos = _posToKey(startRow, startCol);
-    
+
     if (letterGrid[startRow][startCol] != word[0] || visited.contains(pos)) {
       return paths;
     }
-    
+
     if (word.length == 1) {
-      return [[pos]];
+      return [
+        [pos],
+      ];
     }
-    
+
     visited.add(pos);
-    
+
     // Check all adjacent cells
     for (int dr = -1; dr <= 1; dr++) {
       for (int dc = -1; dc <= 1; dc++) {
         if (dr == 0 && dc == 0) continue;
-        
+
         int newRow = startRow + dr;
         int newCol = startCol + dc;
-        
-        if (newRow >= 0 && newRow < gridSize && 
-            newCol >= 0 && newCol < gridSize) {
+
+        if (newRow >= 0 &&
+            newRow < gridSize &&
+            newCol >= 0 &&
+            newCol < gridSize) {
           var subPaths = _findPossiblePaths(
             word.substring(1),
             newRow,
             newCol,
-            Set.from(visited)
+            Set.from(visited),
           );
-          
+
           for (var subPath in subPaths) {
             paths.add([pos, ...subPath]);
           }
         }
       }
     }
-    
+
     return paths;
   }
 
   // Check if a letter at a specific position is needed for remaining words
   bool _isPositionNeededForRemainingWords(int row, int col) {
     String pos = _posToKey(row, col);
-    
+
     // Check each remaining unfound word
     for (var word in puzzles[currentPuzzleIndex].words) {
       if (!foundWords.contains(word)) {
@@ -436,8 +328,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _checkWord() {
     final word = _getCurrentWord();
-    if (word.length >= minWordLength && 
-        puzzles[currentPuzzleIndex].words.contains(word) && 
+    if (word.length >= minWordLength &&
+        puzzles[currentPuzzleIndex].words.contains(word) &&
         !foundWords.contains(word)) {
       setState(() {
         foundWords.add(word);
@@ -452,7 +344,9 @@ class _MyHomePageState extends State<MyHomePage> {
         print('Found words: ${foundWords.toList()}');
         print('Theme words: ${puzzles[currentPuzzleIndex].words}');
         // Check if all words are found
-        bool allWordsFound = puzzles[currentPuzzleIndex].words.every((word) => foundWords.contains(word));
+        bool allWordsFound = puzzles[currentPuzzleIndex].words.every(
+          (word) => foundWords.contains(word),
+        );
         if (allWordsFound) {
           print('All words found!');
           hasWon = true;
@@ -494,7 +388,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ? () => _resetGame(currentPuzzleIndex - 1)
               : null,
         ),
-        title: Text('${widget.title} - ${currentPuzzleIndex + 1}/${puzzles.length}'),
+        title: Text(
+          '${widget.title} - ${currentPuzzleIndex + 1}/${puzzles.length}',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.arrow_forward),
@@ -545,7 +441,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -556,7 +455,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   height: 40,
                   alignment: Alignment.center,
                   child: Text(
-                    selectedCells.isEmpty ? 'Vali tähed, et moodustada sõna' : _getCurrentWord(),
+                    selectedCells.isEmpty
+                        ? 'Vali tähed, et moodustada sõna'
+                        : _getCurrentWord(),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -565,183 +466,300 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cellSize = constraints.maxWidth / gridSize;
-                    return Column(
-                      children: [
-                        GestureDetector(
-                          onPanStart: (details) {
-                            isDragging = true;
-                            _handleTouchSelection(details.localPosition, cellSize);
-                          },
-                          onPanUpdate: (details) {
-                            if (!isDragging) return;
-                            if (details.localPosition.dx >= 0 && 
-                                details.localPosition.dx <= cellSize * gridSize &&
-                                details.localPosition.dy >= 0 && 
-                                details.localPosition.dy <= cellSize * gridSize) {
-                              _handleTouchSelection(details.localPosition, cellSize);
-                            }
-                          },
-                          onPanEnd: (_) {
-                            isDragging = false;
-                            _checkWord();
-                          },
-                          child: Container(
-                            // No outer border for the grid
-                            child: AspectRatio(
-                              aspectRatio: 1,
-                              child: Stack(
-                                children: [
-                                  // Bottom layer: Grid cell circles
-                                  ...List.generate(gridSize * gridSize, (index) {
-                                    final row = index ~/ gridSize;
-                                    final col = index % gridSize;
-                                    final pos = _posToKey(row, col);
-                                    final letter = letterGrid[row][col];
-                                    final isVisible = letter.trim().isNotEmpty;
-                                    return Positioned(
-                                      left: col * cellSize,
-                                      top: row * cellSize,
-                                      width: cellSize,
-                                      height: cellSize,
-                                      child: AnimatedScale(
-                                        scale: isVisible ? 1.0 : 0.0,
-                                        duration: const Duration(milliseconds: 350),
-                                        curve: Curves.easeIn,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            _handleCellSelection(row, col, isClick: true);
-                                            WidgetsBinding.instance.addPostFrameCallback((_) => _checkWord());
-                                          },
-                                          child: Container(
-                                            margin: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
+                Center(
+                  child: SizedBox(
+                    width: 400,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cellSize = constraints.maxWidth / gridSize;
+                        return Column(
+                          children: [
+                            GestureDetector(
+                              onPanStart: (details) {
+                                isDragging = true;
+                                _handleTouchSelection(
+                                  details.localPosition,
+                                  cellSize,
+                                );
+                              },
+                              onPanUpdate: (details) {
+                                if (!isDragging) return;
+                                if (details.localPosition.dx >= 0 &&
+                                    details.localPosition.dx <=
+                                        cellSize * gridSize &&
+                                    details.localPosition.dy >= 0 &&
+                                    details.localPosition.dy <=
+                                        cellSize * gridSize) {
+                                  _handleTouchSelection(
+                                    details.localPosition,
+                                    cellSize,
+                                  );
+                                }
+                              },
+                              onPanEnd: (_) {
+                                isDragging = false;
+                                _checkWord();
+                              },
+                              child: Container(
+                                // No outer border for the grid
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: Stack(
+                                    children: [
+                                      // Bottom layer: Grid cell circles
+                                      ...List.generate(gridSize * gridSize, (
+                                        index,
+                                      ) {
+                                        final row = index ~/ gridSize;
+                                        final col = index % gridSize;
+                                        final pos = _posToKey(row, col);
+                                        final letter = letterGrid[row][col];
+                                        final isVisible = letter.trim().isNotEmpty;
+                                        return Positioned(
+                                          left: col * cellSize,
+                                          top: row * cellSize,
+                                          width: cellSize,
+                                          height: cellSize,
+                                          child: AnimatedScale(
+                                            scale: isVisible ? 1.0 : 0.0,
+                                            duration: const Duration(
+                                              milliseconds: 350,
+                                            ),
+                                            curve: Curves.easeIn,
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                _handleCellSelection(
+                                                  row,
+                                                  col,
+                                                  isClick: true,
+                                                );
+                                                WidgetsBinding.instance
+                                                    .addPostFrameCallback(
+                                                      (_) => _checkWord(),
+                                                    );
+                                              },
+                                              child: Container(
+                                                margin: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        );
+                                      }),
+                                      // Middle layer: Selection lines (only latest segment animated)
+                                      LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final segments =
+                                              selectedCellsOrder.length;
+                                          if (segments == 0)
+                                            return const SizedBox.shrink();
+                                          return AnimatedOpacity(
+                                            opacity: _animateTraceLineOut
+                                                ? 0.0
+                                                : 1.0,
+                                            duration: const Duration(
+                                              milliseconds: 350,
+                                            ),
+                                            child: Stack(
+                                              children: [
+                                                // Always draw static segments instantly, including after reverse animation
+                                                CustomPaint(
+                                                  key: ValueKey(
+                                                    'static-segments-$segments-${selectedCellsOrder.join('-')}',
+                                                  ),
+                                                  size: Size(
+                                                    constraints.maxWidth,
+                                                    constraints.maxHeight,
+                                                  ),
+                                                  painter: SelectionLinePainter(
+                                                    selectedCellsOrder: segments > 1
+                                                        ? selectedCellsOrder
+                                                              .sublist(
+                                                                0,
+                                                                segments - 1,
+                                                              )
+                                                        : selectedCellsOrder,
+                                                    cellSize: cellSize,
+                                                    gridSize: gridSize,
+                                                  ),
+                                                ),
+                                                // Animate only the last segment (forward) or the segment being removed (reverse)
+                                                if (segments > 1 &&
+                                                    !_lastActionWasRemove)
+                                                  KeyedSubtree(
+                                                    key: ValueKey(
+                                                      'animated-segment-${segments - 1}-${selectedCellsOrder.join('-')}-forward',
+                                                    ),
+                                                    child: TweenAnimationBuilder<double>(
+                                                      tween: Tween<double>(
+                                                        begin: 0,
+                                                        end: 1,
+                                                      ),
+                                                      duration: const Duration(
+                                                        milliseconds: 250,
+                                                      ),
+                                                      builder: (context, t, child) {
+                                                        final current =
+                                                            selectedCellsOrder[segments -
+                                                                    2]
+                                                                .split(',')
+                                                                .map(int.parse)
+                                                                .toList();
+                                                        final next =
+                                                            selectedCellsOrder[segments -
+                                                                    1]
+                                                                .split(',')
+                                                                .map(int.parse)
+                                                                .toList();
+                                                        final startX =
+                                                            (current[1] + 0.5) *
+                                                            cellSize;
+                                                        final startY =
+                                                            (current[0] + 0.5) *
+                                                            cellSize;
+                                                        final endX =
+                                                            (next[1] + 0.5) *
+                                                            cellSize;
+                                                        final endY =
+                                                            (next[0] + 0.5) *
+                                                            cellSize;
+                                                        return CustomPaint(
+                                                          size: Size(
+                                                            constraints.maxWidth,
+                                                            constraints.maxHeight,
+                                                          ),
+                                                          painter:
+                                                              AnimatedSegmentPainter(
+                                                                start: Offset(
+                                                                  startX,
+                                                                  startY,
+                                                                ),
+                                                                end: Offset(
+                                                                  endX,
+                                                                  endY,
+                                                                ),
+                                                                progress: t,
+                                                              ),
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                // Animate the segment being removed in reverse
+                                                if (_lastActionWasRemove &&
+                                                    _prevSegmentStart != null &&
+                                                    _prevSegmentEnd != null)
+                                                  KeyedSubtree(
+                                                    key: ValueKey(
+                                                      'reverse-animated-segment-$segments-${selectedCellsOrder.join('-')}',
+                                                    ),
+                                                    child: TweenAnimationBuilder<double>(
+                                                      tween: Tween<double>(
+                                                        begin: 1,
+                                                        end: 0,
+                                                      ),
+                                                      duration: const Duration(
+                                                        milliseconds: 250,
+                                                      ),
+                                                      onEnd: () {
+                                                        setState(() {
+                                                          _lastActionWasRemove =
+                                                              false;
+                                                          _prevSegmentStart = null;
+                                                          _prevSegmentEnd = null;
+                                                        });
+                                                      },
+                                                      builder: (context, t, child) {
+                                                        final current =
+                                                            _prevSegmentStart!
+                                                                .split(',')
+                                                                .map(int.parse)
+                                                                .toList();
+                                                        final next =
+                                                            _prevSegmentEnd!
+                                                                .split(',')
+                                                                .map(int.parse)
+                                                                .toList();
+                                                        final startX =
+                                                            (current[1] + 0.5) *
+                                                            cellSize;
+                                                        final startY =
+                                                            (current[0] + 0.5) *
+                                                            cellSize;
+                                                        final endX =
+                                                            (next[1] + 0.5) *
+                                                            cellSize;
+                                                        final endY =
+                                                            (next[0] + 0.5) *
+                                                            cellSize;
+                                                        return CustomPaint(
+                                                          size: Size(
+                                                            constraints.maxWidth,
+                                                            constraints.maxHeight,
+                                                          ),
+                                                          painter:
+                                                              AnimatedSegmentPainter(
+                                                                start: Offset(
+                                                                  startX,
+                                                                  startY,
+                                                                ),
+                                                                end: Offset(
+                                                                  endX,
+                                                                  endY,
+                                                                ),
+                                                                progress: t,
+                                                              ),
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          );
+                                        },
                                       ),
-                                    );
-                                  }),
-                                  // Middle layer: Selection lines (only latest segment animated)
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final segments = selectedCellsOrder.length;
-                                      if (segments == 0) return const SizedBox.shrink();
-                                      return AnimatedOpacity(
-                                        opacity: _animateTraceLineOut ? 0.0 : 1.0,
-                                        duration: const Duration(milliseconds: 350),
-                                        child: Stack(
-                                          children: [
-                                            // Always draw static segments instantly, including after reverse animation
-                                            CustomPaint(
-                                              key: ValueKey('static-segments-$segments-${selectedCellsOrder.join('-')}'),
-                                              size: Size(constraints.maxWidth, constraints.maxHeight),
-                                              painter: SelectionLinePainter(
-                                                selectedCellsOrder: segments > 1
-                                                    ? selectedCellsOrder.sublist(0, segments - 1)
-                                                    : selectedCellsOrder,
-                                                cellSize: cellSize,
-                                                gridSize: gridSize,
+                                      // Top layer: Letters
+                                      ...List.generate(gridSize * gridSize, (
+                                        index,
+                                      ) {
+                                        final row = index ~/ gridSize;
+                                        final col = index % gridSize;
+                                        final isSelected = selectedCells.contains(
+                                          _posToKey(row, col),
+                                        );
+
+                                        return Positioned(
+                                          left: col * cellSize,
+                                          top: row * cellSize,
+                                          width: cellSize,
+                                          height: cellSize,
+                                          child: Center(
+                                            child: Text(
+                                              letterGrid[row][col],
+                                              style: TextStyle(
+                                                fontSize: 48,
+                                                fontWeight: FontWeight.bold,
+                                                color: isSelected
+                                                    ? Colors.white
+                                                    : Colors.black,
                                               ),
                                             ),
-                                            // Animate only the last segment (forward) or the segment being removed (reverse)
-                                            if (segments > 1 && !_lastActionWasRemove)
-                                              KeyedSubtree(
-                                                key: ValueKey('animated-segment-${segments - 1}-${selectedCellsOrder.join('-')}-forward'),
-                                                child: TweenAnimationBuilder<double>(
-                                                  tween: Tween<double>(begin: 0, end: 1),
-                                                  duration: const Duration(milliseconds: 250),
-                                                  builder: (context, t, child) {
-                                                    final current = selectedCellsOrder[segments - 2].split(',').map(int.parse).toList();
-                                                    final next = selectedCellsOrder[segments - 1].split(',').map(int.parse).toList();
-                                                    final startX = (current[1] + 0.5) * cellSize;
-                                                    final startY = (current[0] + 0.5) * cellSize;
-                                                    final endX = (next[1] + 0.5) * cellSize;
-                                                    final endY = (next[0] + 0.5) * cellSize;
-                                                    return CustomPaint(
-                                                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                                                      painter: _AnimatedSegmentPainter(
-                                                        start: Offset(startX, startY),
-                                                        end: Offset(endX, endY),
-                                                        progress: t,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            // Animate the segment being removed in reverse
-                                            if (_lastActionWasRemove && _prevSegmentStart != null && _prevSegmentEnd != null)
-                                              KeyedSubtree(
-                                                key: ValueKey('reverse-animated-segment-$segments-${selectedCellsOrder.join('-')}'),
-                                                child: TweenAnimationBuilder<double>(
-                                                  tween: Tween<double>(begin: 1, end: 0),
-                                                  duration: const Duration(milliseconds: 250),
-                                                  onEnd: () {
-                                                    setState(() {
-                                                      _lastActionWasRemove = false;
-                                                      _prevSegmentStart = null;
-                                                      _prevSegmentEnd = null;
-                                                    });
-                                                  },
-                                                  builder: (context, t, child) {
-                                                    final current = _prevSegmentStart!.split(',').map(int.parse).toList();
-                                                    final next = _prevSegmentEnd!.split(',').map(int.parse).toList();
-                                                    final startX = (current[1] + 0.5) * cellSize;
-                                                    final startY = (current[0] + 0.5) * cellSize;
-                                                    final endX = (next[1] + 0.5) * cellSize;
-                                                    final endY = (next[0] + 0.5) * cellSize;
-                                                    return CustomPaint(
-                                                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                                                      painter: _AnimatedSegmentPainter(
-                                                        start: Offset(startX, startY),
-                                                        end: Offset(endX, endY),
-                                                        progress: t,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      );
-                                    },
+                                          ),
+                                        );
+                                      }),
+                                    ],
                                   ),
-                                  // Top layer: Letters
-                                  ...List.generate(gridSize * gridSize, (index) {
-                                    final row = index ~/ gridSize;
-                                    final col = index % gridSize;
-                                    final isSelected = selectedCells.contains(_posToKey(row, col));
-                                    
-                                    return Positioned(
-                                      left: col * cellSize,
-                                      top: row * cellSize,
-                                      width: cellSize,
-                                      height: cellSize,
-                                      child: Center(
-                                        child: Text(
-                                          letterGrid[row][col],
-                                          style: TextStyle(
-                                            fontSize: 48,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.white : Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        // Removed Submit Word button
-                      ],
-                    );
-              },
-            ),
+                            // Removed Submit Word button
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -761,24 +779,35 @@ class _MyHomePageState extends State<MyHomePage> {
                         runSpacing: 8,
                         children: puzzles[currentPuzzleIndex].words.map((word) {
                           final found = foundWords.contains(word);
+                          final displayChars = found
+                              ? word.split('')
+                              : [word[0], ...List.filled(word.length - 1, '_')];
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: found ? Colors.green : Colors.grey.withOpacity(0.1),
+                              color: found
+                                  ? Colors.green
+                                  : Colors.grey.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  word,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: found ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                              children: displayChars
+                                  .map((char) => Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                                        child: Text(
+                                          char,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: found ? Colors.white : Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
                             ),
                           );
                         }).toList(),
@@ -821,10 +850,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       const SizedBox(height: 16),
                       Text(
                         'Leidsid kõik sõnad!',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[800],
-                        ),
+                        style: TextStyle(fontSize: 18, color: Colors.grey[800]),
                       ),
                       const SizedBox(height: 8),
                       Text(
