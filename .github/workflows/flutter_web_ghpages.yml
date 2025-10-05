@@ -1,5 +1,8 @@
 name: Build and Deploy Flutter Web to GitHub Pages
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -16,6 +19,15 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-flutter-${{ hashFiles('app/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
 
       - name: Install dependencies
         run: flutter pub get
