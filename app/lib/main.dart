@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' show sqrt;
 import 'util/selection_line_painter.dart';
 import 'util/animated_segment_painter.dart';
+import 'puzzles.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,11 +22,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Word Search Game',
+      title: 'Sõnasalat',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: const MyHomePage(title: 'Word Search Game'),
+      home: const MyHomePage(title: 'Sõnasalat'),
     );
   }
 }
@@ -38,6 +39,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  // Track how many letters are revealed for each word
+  Map<String, int> revealedLetters = {};
   // Controls trace line disappearance animation
   bool _animateTraceLineOut = false;
   // Track previous segment for reverse animation
@@ -67,38 +70,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int currentPuzzleIndex = 0;
   bool showNextPuzzleButton = false;
 
-  final List<Puzzle> puzzles = [
-    Puzzle(
-      theme: 'Riided',
-      grid: [
-        ['P', 'K', 'I', 'L'],
-        ['M', 'Ü', 'T', 'E'],
-        ['B', 'K', 'S', 'E'],
-        ['A', 'R', 'I', 'D'],
-      ],
-      words: ['MÜTS', 'PÜKSID', 'KÜBAR', 'SEELIK'],
-    ),
-    Puzzle(
-      theme: 'Värvid',
-      grid: [
-        ['K', 'S', 'I', 'L'],
-        ['P', 'O', 'L', 'N'],
-        ['U', 'E', 'I', 'L'],
-        ['N', 'A', 'N', 'A'],
-      ],
-      words: ['SININE', 'KOLLANE', 'PUNANE', 'LILLA'],
-    ),
-    Puzzle(
-      theme: 'Vedelikud',
-      grid: [
-        ['L', 'E', 'I', 'P'],
-        ['H', 'V', 'S', 'I'],
-        ['O', 'A', 'M', 'N'],
-        ['K', 'R', 'A', 'D'],
-      ],
-      words: ['KOHV', 'MAHL', 'PIIM', 'VIIN', 'VESI', 'PISARAD'],
-    ),
-  ];
+  // puzzles are now imported from puzzles.dart
 
   void _resetGame([int? puzzleIndex]) {
     setState(() {
@@ -116,6 +88,8 @@ class _MyHomePageState extends State<MyHomePage> {
       showNextPuzzleButton = false;
       startTime = DateTime.now();
       elapsedTime = '00:00';
+      // Reset revealed letters for all words
+      revealedLetters = { for (var w in puzzle.words) w: 0 };
     });
     _startTimer();
   }
@@ -443,7 +417,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
-                      vertical: 12,
+                      vertical: 24,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -779,35 +753,47 @@ class _MyHomePageState extends State<MyHomePage> {
                         runSpacing: 8,
                         children: puzzles[currentPuzzleIndex].words.map((word) {
                           final found = foundWords.contains(word);
+                          final revealCount = revealedLetters[word] ?? 0;
                           final displayChars = found
                               ? word.split('')
-                              : [word[0], ...List.filled(word.length - 1, '_')];
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: found
-                                  ? Colors.green
-                                  : Colors.grey.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: displayChars
-                                  .map((char) => Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
-                                        child: Text(
-                                          char,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: found ? Colors.white : Colors.black,
-                                            fontWeight: FontWeight.bold,
+                              : List.generate(word.length, (i) => i < revealCount ? word[i] : '_');
+                          return GestureDetector(
+                            onTap: found
+                                ? null
+                                : () {
+                                    setState(() {
+                                      if (revealCount < word.length) {
+                                        revealedLetters[word] = revealCount + 1;
+                                      }
+                                    });
+                                  },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: found
+                                    ? Colors.green
+                                    : Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: displayChars
+                                    .map((char) => Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                          child: Text(
+                                            char,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: found ? Colors.white : Colors.black,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                      ))
-                                  .toList(),
+                                        ))
+                                    .toList(),
+                              ),
                             ),
                           );
                         }).toList(),
