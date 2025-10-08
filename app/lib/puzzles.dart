@@ -14,10 +14,10 @@ final List<Puzzle> puzzles = [
   Puzzle(
     theme: 'Värvid',
     grid: [
-      ['K', 'S', 'I', 'L'],
-      ['P', 'O', 'L', 'N'],
-      ['U', 'E', 'I', 'L'],
-      ['N', 'A', 'N', 'A'],
+      ['I', 'N', 'I', 'S'],
+      ['N', 'E', 'I', 'L'],
+      ['P', 'A', 'L', 'L'],
+      ['U', 'N', 'O', 'K'],
     ],
     words: ['SININE', 'KOLLANE', 'PUNANE', 'LILLA'],
   ),

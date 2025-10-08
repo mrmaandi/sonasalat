@@ -70,6 +70,9 @@ class _MyHomePageState extends State<MyHomePage> {
   int currentPuzzleIndex = 0;
   bool showNextPuzzleButton = false;
 
+  // Track word positions for smart letter removal
+  Map<String, List<String>> wordPositions = {}; // word -> list of positions "row,col"
+
   // puzzles are now imported from puzzles.dart
 
   void _resetGame([int? puzzleIndex]) {
@@ -90,11 +93,31 @@ class _MyHomePageState extends State<MyHomePage> {
       elapsedTime = '00:00';
       // Reset revealed letters for all words
       revealedLetters = { for (var w in puzzle.words) w: 0 };
+      // Initialize word positions by finding them in the grid
+      _initializeWordPositions();
     });
     _startTimer();
   }
 
   String _posToKey(int row, int col) => '$row,$col';
+
+  // Initialize word positions by finding all possible paths for each word
+  void _initializeWordPositions() {
+    wordPositions.clear();
+    for (var word in puzzles[currentPuzzleIndex].words) {
+      for (int startRow = 0; startRow < gridSize; startRow++) {
+        for (int startCol = 0; startCol < gridSize; startCol++) {
+          var paths = _findPossiblePaths(word, startRow, startCol, {});
+          if (paths.isNotEmpty) {
+            // Use the first valid path found for this word
+            wordPositions[word] = paths.first;
+            break;
+          }
+        }
+        if (wordPositions.containsKey(word)) break;
+      }
+    }
+  }
 
   void _startTimer() {
     Future.doWhile(() async {
@@ -307,13 +330,9 @@ class _MyHomePageState extends State<MyHomePage> {
         !foundWords.contains(word)) {
       setState(() {
         foundWords.add(word);
-        // Clear letters only if they're not needed for remaining words
-        for (String pos in selectedCellsOrder) {
-          final coords = pos.split(',').map(int.parse).toList();
-          if (!_isPositionNeededForRemainingWords(coords[0], coords[1])) {
-            letterGrid[coords[0]][coords[1]] = ' ';
-          }
-        }
+        // Remove letters that are only used by this word
+        _removeWordLetters(word);
+        
         // Check if player has won
         print('Found words: ${foundWords.toList()}');
         print('Theme words: ${puzzles[currentPuzzleIndex].words}');
@@ -340,6 +359,35 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // Remove letters of a found word, but keep letters shared with remaining words
+  void _removeWordLetters(String foundWord) {
+    if (!wordPositions.containsKey(foundWord)) return;
+    
+    List<String> wordPath = wordPositions[foundWord]!;
+    Set<String> remainingWords = puzzles[currentPuzzleIndex].words
+        .where((word) => !foundWords.contains(word) && word != foundWord)
+        .toSet();
+    
+    for (String position in wordPath) {
+      bool isSharedWithOtherWord = false;
+      
+      // Check if this position is used by any remaining word
+      for (String remainingWord in remainingWords) {
+        if (wordPositions.containsKey(remainingWord) &&
+            wordPositions[remainingWord]!.contains(position)) {
+          isSharedWithOtherWord = true;
+          break;
+        }
+      }
+      
+      // Only remove letter if it's not shared
+      if (!isSharedWithOtherWord) {
+        final coords = position.split(',').map(int.parse).toList();
+        letterGrid[coords[0]][coords[1]] = ' ';
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -347,6 +395,7 @@ class _MyHomePageState extends State<MyHomePage> {
     letterGrid = List.from(puzzle.grid.map((row) => List<String>.from(row)));
     theme = puzzle.theme;
     availableWords = puzzle.words.toList();
+    _initializeWordPositions();
     startTime = DateTime.now();
     _startTimer();
   }
@@ -399,10 +448,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                   ],
-                ),
-                Text(
-                  'Leitud ${foundWords.length}/${puzzles[currentPuzzleIndex].words.length} sõna',
-                  style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
